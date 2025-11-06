@@ -1,0 +1,87 @@
+# ==============================================
+# Railway-Optimized Dockerfile for Terra Industries Backend
+# ==============================================
+# Multi-stage build optimized for Railway deployment
+# Uses npm for better Railway compatibility
+# ==============================================
+
+# ----------------------------------------------
+# Stage 1: Dependencies
+# ----------------------------------------------
+FROM node:20-alpine AS deps
+
+WORKDIR /app
+
+# Install build dependencies for native modules (bcrypt, sharp)
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    openssl
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies with npm (Railway-friendly)
+RUN npm ci --legacy-peer-deps || npm install
+
+# ----------------------------------------------
+# Stage 2: Builder
+# ----------------------------------------------
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Install OpenSSL for Prisma
+RUN apk add --no-cache openssl
+
+# Copy dependencies from deps stage
+COPY --from=deps /app/node_modules ./node_modules
+
+# Copy source code
+COPY . .
+
+# Generate Prisma Client
+RUN npx prisma generate
+
+# Build application
+RUN npm run build
+
+# ----------------------------------------------
+# Stage 3: Production Runner
+# ----------------------------------------------
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+
+# Install OpenSSL for Prisma runtime
+RUN apk add --no-cache openssl
+
+# Set production environment
+ENV NODE_ENV=production
+ENV PORT=4000
+
+# Create non-root user for security
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nestjs
+
+# Copy necessary files from builder
+COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
+COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nestjs:nodejs /app/package*.json ./
+COPY --from=builder --chown=nestjs:nodejs /app/prisma ./prisma
+
+# Switch to non-root user
+USER nestjs
+
+# Expose port
+EXPOSE 4000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:4000/api/v1/health/liveness', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+
+# Start application
+# Railway will run migrations via start command
+CMD ["node", "dist/main.js"]
+

@@ -1,0 +1,184 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String                 @id @default(uuid()) @db.Uuid
+  email        String                 @unique
+  passwordHash String                 @map("password_hash")
+  fullName     String?                @map("full_name")
+  role         String                 @default("admin")
+  isActive     Boolean                @default(true) @map("is_active")
+  lastLoginAt  DateTime?              @map("last_login_at")
+  createdAt    DateTime               @default(now()) @map("created_at")
+  updatedAt    DateTime               @updatedAt @map("updated_at")
+  activityLogs ActivityLog[]
+  inquiries    Inquiry[]
+  mediaFiles   MediaFile[]
+  newsStories  NewsStory[]
+  productSpecs ProductSpecification[]
+
+  @@map("users")
+}
+
+model Inquiry {
+  id           String       @id @default(uuid()) @db.Uuid
+  inquiryType  String       @map("inquiry_type")
+  fullName     String       @map("full_name")
+  email        String
+  phone        String?
+  company      String?
+  country      String
+  message      String
+  status       String       @default("new")
+  leadScore    Int          @default(0) @map("lead_score")
+  assignedToId String?      @map("assigned_to") @db.Uuid
+  metadata     Json?
+  source       String       @default("website")
+  ipAddress    String?      @map("ip_address")
+  userAgent    String?      @map("user_agent")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  assignedTo   User?        @relation(fields: [assignedToId], references: [id])
+  rfqs         RfqRequest[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([leadScore])
+  @@map("inquiries")
+}
+
+model RfqRequest {
+  id              String    @id @default(uuid()) @db.Uuid
+  inquiryId       String?   @map("inquiry_id") @db.Uuid
+  productCategory String    @map("product_category")
+  quantity        Int?
+  budgetRange     String?   @map("budget_range")
+  timeline        String?
+  requirements    String?
+  specifications  Json?
+  status          String    @default("pending")
+  quoteAmount     Decimal?  @map("quote_amount") @db.Decimal(15, 2)
+  quoteSentAt     DateTime? @map("quote_sent_at")
+  decisionDate    DateTime? @map("decision_date") @db.Date
+  notes           String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  inquiry         Inquiry?  @relation(fields: [inquiryId], references: [id])
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([inquiryId])
+  @@map("rfq_requests")
+}
+
+model EmailQueue {
+  id            String    @id @default(uuid()) @db.Uuid
+  toEmail       String    @map("to_email")
+  fromEmail     String?   @map("from_email")
+  subject       String
+  bodyHtml      String?   @map("body_html")
+  bodyText      String?   @map("body_text")
+  templateName  String?   @map("template_name")
+  templateData  Json?     @map("template_data")
+  status        String    @default("pending")
+  attempts      Int       @default(0)
+  lastAttemptAt DateTime? @map("last_attempt_at")
+  sentAt        DateTime? @map("sent_at")
+  errorMessage  String?   @map("error_message")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([status, createdAt])
+  @@map("email_queue")
+}
+
+model MediaFile {
+  id                String      @id @default(uuid()) @db.Uuid
+  fileName          String      @map("file_name")
+  fileType          String      @map("file_type")
+  mimeType          String      @map("mime_type")
+  fileSize          BigInt      @map("file_size")
+  storagePath       String      @map("storage_path")
+  publicUrl         String      @map("public_url")
+  width             Int?
+  height            Int?
+  altText           String?     @map("alt_text")
+  caption           String?
+  tags              String[]
+  uploadedById      String      @map("uploaded_by") @db.Uuid
+  entityType        String?     @map("entity_type")
+  entityId          String?     @map("entity_id") @db.Uuid
+  createdAt         DateTime    @default(now()) @map("created_at")
+  uploadedBy        User        @relation(fields: [uploadedById], references: [id])
+  featuredInStories NewsStory[]
+
+  @@index([entityType, entityId])
+  @@index([uploadedById])
+  @@map("media_files")
+}
+
+model ActivityLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  action     String
+  entityType String?  @map("entity_type")
+  entityId   String?  @map("entity_id") @db.Uuid
+  changes    Json?
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+  user       User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([entityType, entityId])
+  @@map("activity_logs")
+}
+
+model NewsStory {
+  id              String     @id @default(uuid()) @db.Uuid
+  title           String
+  slug            String     @unique
+  content         String
+  excerpt         String?
+  authorId        String     @map("author_id") @db.Uuid
+  status          String     @default("draft")
+  publishedAt     DateTime?  @map("published_at")
+  featuredImageId String?    @map("featured_image_id") @db.Uuid
+  category        String?
+  tags            String[]
+  viewCount       Int        @default(0) @map("view_count")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+  author          User       @relation(fields: [authorId], references: [id])
+  featuredImage   MediaFile? @relation(fields: [featuredImageId], references: [id])
+
+  @@index([status, publishedAt])
+  @@index([authorId])
+  @@index([slug])
+  @@index([category])
+  @@map("news_stories")
+}
+
+model ProductSpecification {
+  id                 String   @id @default(uuid()) @db.Uuid
+  productName        String   @map("product_name")
+  category           String
+  specifications     Json
+  performanceMetrics Json     @map("performance_metrics")
+  technicalDetails   Json     @map("technical_details")
+  mediaGalleryIds    String[] @map("media_gallery_ids")
+  createdById        String   @map("created_by") @db.Uuid
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  createdBy          User     @relation(fields: [createdById], references: [id])
+
+  @@index([category])
+  @@index([createdById])
+  @@map("product_specifications")
+}
