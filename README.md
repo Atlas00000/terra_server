@@ -10,7 +10,7 @@
 
 **Enterprise-grade REST API powering Terra Industries' defense technology platform**
 
-[🌐 Live API](https://terraserver-production.up.railway.app) • [📚 API Docs](https://terraserver-production.up.railway.app/api-docs) • [🏥 Health Check](https://terraserver-production.up.railway.app/api/v1/health/liveness)
+[🌐 Live API](https://terraserver-production.up.railway.app) • [📚 API Docs](https://terraserver-production.up.railway.app/api-docs) • [📋 Changelog](docs/CHANGELOG.md) • [🚀 Deployment Guide](docs/RAILWAY-DEPLOYMENT-GUIDE.md)
 
 </div>
 
